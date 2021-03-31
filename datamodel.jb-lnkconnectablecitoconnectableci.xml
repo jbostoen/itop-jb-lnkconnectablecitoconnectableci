@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<itop_design xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.6">
+	<classes>
+		<class id="lnkConnectableCIToConnectableCI" _delta="define">
+			<parent>cmdbAbstractObject</parent>
+			<properties>
+				<is_link>1</is_link>
+				<category>bizmodel</category>
+				<abstract>false</abstract>
+				<key_type>autoincrement</key_type>
+				<db_table>lnkconnectablecitoconnectableci</db_table>
+				<db_key_field>id</db_key_field>
+				<db_final_class_field/>
+				<naming>
+					<attributes>
+						<attribute id="device1_id"/>
+						<attribute id="device2_id"/>
+					</attributes>
+				</naming>
+				<display_template/>
+				<icon/>
+				<reconciliation>
+					<attributes>
+						<attribute id="device1_id"/>
+						<attribute id="device2_id"/>
+					</attributes>
+				</reconciliation>
+			</properties>
+			<fields>
+				<field id="device1_id" xsi:type="AttributeExternalKey">
+					<sql>device1_id</sql>
+					<target_class>ConnectableCI</target_class>
+					<is_null_allowed>false</is_null_allowed>
+					<on_target_delete>DEL_AUTO</on_target_delete>
+				</field>
+				<field id="device1_name" xsi:type="AttributeExternalField">
+					<extkey_attcode>device1_id</extkey_attcode>
+					<target_attcode>name</target_attcode>
+				</field>
+				<field id="device1_port" xsi:type="AttributeString">
+					<sql>device1_port</sql>
+					<default_value/>
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="device2_id" xsi:type="AttributeExternalKey">
+					<sql>device2_id</sql>
+					<target_class>ConnectableCI</target_class>
+					<is_null_allowed>false</is_null_allowed>
+					<on_target_delete>DEL_AUTO</on_target_delete>
+				</field>
+				<field id="device2_name" xsi:type="AttributeExternalField">
+					<extkey_attcode>device2_id</extkey_attcode>
+					<target_attcode>name</target_attcode>
+				</field>
+				<field id="device2_port" xsi:type="AttributeString">
+					<sql>device2_port</sql>
+					<default_value/>
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="connection_type" xsi:type="AttributeEnum">
+					<values>
+						<value id="uplink">uplink</value>
+						<value id="downlink">downlink</value>
+					</values>
+					<sql>type</sql>
+					<default_value>downlink</default_value>
+					<is_null_allowed>false</is_null_allowed>
+					<display_style>list</display_style>
+				</field>
+				<field id="patch_label" xsi:type="AttributeString" _delta="define">
+					<sql>patch_label</sql>
+					<default_value/>
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+				<field id="cable_type" xsi:type="AttributeEnum" _delta="define">
+					<sql>cable_type</sql>
+					<default_value/>
+					<is_null_allowed>true</is_null_allowed>
+					<values>
+						<value id="rj45">rj45</value>
+						<value id="optical_fiber_single_mode">optical_fiber_single_mode</value>
+						<value id="optical_fiber_multi_mode">optical_fiber_multi_mode</value>
+						<value id="usb_3_0">usb_3_0</value>
+					</values>
+				</field>
+				<field id="comment" xsi:type="AttributeString" _delta="define">
+					<sql>comment</sql>
+					<default_value/>
+					<is_null_allowed>true</is_null_allowed>
+				</field>
+			</fields>
+			<methods>  
+				<method id="AddConnectedNetworkDevice">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-cmdbAbstractObject</type>
+					<code><![CDATA[	
+					
+	protected function AddConnectedNetworkDevice() {
+		/* 
+			Explanation:
+			
+			ConnectableCI has a field 'networkdevice_list'. It's an indirect set, meaning multiple connections are possible. 
+			networkdevice_list (originally lnkConnectableCIToNetworkDevice) uses device1_id to refer to itself (NAS, Server, ...) and device2_id to point to what's remotely connected.
+			The logic below is easier if you think from the perspective of the original lnkConnectableCIToNetworkDevice class.
+			
+			Example 1: from the details view of a PC, a link with a network device is added.
+			- AddConnectedNetworkDevice() is triggered. Type of device1_id = pc; device2_id = NetworkDevice (switch).
+			- $oDevice is an object (pc).
+			- Only Network Device subclasses and IPPhone are supported. Otherwise no link is created.
+			  
+			Example 2: from the details view of a Network Device (or IP Phone = switch), a link with a network device is added.
+			- AddConnectedNetworkDevice() is triggered. Type of device1_id = NetworkDevice; device2_id = NetworkDevice (switch).
+			- $oDevice is an object (NetworkDevice). It's of the right type (!= NAS, Server, ...).
+			- The counterpart is created.			
+			
+			So how is this handled in the datamodel?
+			- ConnectableCI has an AttributeLinkedSetIndirect -> networkdevice_list -> ext_key_to_me = device1_id ; ext_key_to_remote = device2_id (PCs, Server etc)
+			- NetworkDevice has an AttributeLinkedSetIndirect -> connectablecis_list -> ext_key_to_me = network_id ; ext_key_to_remote = device1_id
+			  NetworkDevice still has networkdevice_list, but it's hidden in presentation. (see data model viewer)
+			
+			
+		*/
+	
+		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'));
+		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
+		
+			$oLnkCounterPart = $this->GetCounterPart();
+			
+			if($oLnkCounterPart === null) {
+			
+				// For the counterpart, the IDs, ports and uplink/downlink are switched around.
+				$oNewLink = new lnkConnectableCIToConnectableCI();
+				$oNewLink->Set('device2_id', $this->Get('device1_id'));
+				$oNewLink->Set('device1_id', $this->Get('device2_id'));
+				$oNewLink->Set('device2_port', $this->Get('device1_port'));
+				$oNewLink->Set('device1_port', $this->Get('device2_port'));
+				$oNewLink->Set('patch_label', $this->Get('patch_label'));
+				$oNewLink->Set('comment', $this->Get('comment'));
+				$oNewLink->Set('cable_type', $this->Get('cable_type'));
+				$oNewLink->Set('connection_type', ($this->Get('connection_type') == 'uplink' ? 'downlink' : 'uplink'));
+				$oNewLink->DBInsert();
+				
+			}
+		}
+	}]]></code>
+				</method>
+				<method id="UpdateConnectedNetworkDevice">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-cmdbAbstractObject</type>
+					<code><![CDATA[	
+					
+	protected function UpdateConnectedNetworkDevice() {
+					
+		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'));
+		
+		// IPPhone here is to support jb-ipdevices
+		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
+		
+			$oLnkCounterPart = $this->GetCounterPart();
+			
+			// There should be one link - do it in a safe manner anyway
+			if($oLnkCounterPart !== null) {
+				$oLnkCounterPart->Set('connection_type', ($this->Get('connection_type') == 'uplink' ? 'downlink' : 'uplink'));
+				$oLnkCounterPart->Set('device2_port', $this->Get('device1_port'));
+				$oLnkCounterPart->Set('device1_port', $this->Get('device2_port'));
+				$oLnkCounterPart->Set('patch_label', $this->Get('patch_label'));
+				$oLnkCounterPart->Set('comment', $this->Get('comment'));
+				$oLnkCounterPart->Set('cable_type', $this->Get('cable_type'));
+				$oLnkCounterPart->DBUpdate();	
+			}
+			
+		}
+	}]]></code>
+				</method>
+				<method id="DeleteConnectedNetworkDevice">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-cmdbAbstractObject</type>
+					<code><![CDATA[	
+					
+	protected function DeleteConnectedNetworkDevice() {
+					
+		// The device might be already deleted (reentrance in the current procedure when both device are NETWORK devices!)
+		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'), false);
+		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
+		
+			$oLnkCounterPart = $this->GetCounterPart();
+			
+			// There should be one link - do it in a safe manner anyway
+			if($oLnkCounterPart !== null) {
+				$oLnkCounterPart->DBDelete();	
+			}
+		}
+		
+	}]]></code>
+				</method>
+				<method id="AfterInsert">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-DBObject</type>
+					<code><![CDATA[	
+				
+	protected function AfterInsert() {
+		$this->AddConnectedNetworkDevice();
+		parent::AfterInsert();
+		
+	}]]></code>
+				</method>
+				<method id="AfterUpdate">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-DBObject</type>
+					<code><![CDATA[	
+					
+	protected function AfterUpdate() {
+		$this->UpdateConnectedNetworkDevice();
+		parent::AfterUpdate();
+	}]]></code>
+				</method>
+				<method id="AfterDelete">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-DBObject</type>
+					<code><![CDATA[	
+					
+	protected function AfterDelete() {
+		$this->DeleteConnectedNetworkDevice();
+		parent::AfterDelete();
+		
+	}]]></code>
+				</method>
+				<method id="DeleteConnectedNetworkDevice">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-cmdbAbstractObject</type>
+					<code><![CDATA[	
+					
+	protected function GetCounterPart() {
+	
+		// Find the exact same link
+		$sOQL = "SELECT lnkConnectableCIToConnectableCI WHERE device1_id = :device1_id AND device2_id = :device2_id AND device1_port = :device1_port AND device2_port = :device2_port AND patch_label = :patch_label AND comment = :comment AND connection_type = :connection_type AND cable_type = :cable_type";
+		
+		// Switch device and port around (1 <=> 2); do same for uplink/downlink
+		
+		$oSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+			[],
+			[
+				'device2_id' => $this->Get('device1_id'),
+				'device1_id' => $this->Get('device2_id'),
+				'device2_port' => $this->Get('device1_port'),
+				'device1_port' => $this->Get('device2_port'),
+				'connection_type' => ($this->Get('connection_type') == 'uplink' ? 'downlink' : 'uplink'),
+				'patch_label' => $this->Get('patch_label'),
+				'comment' => $this->Get('comment'),
+				'cable_type' => $this->Get('cable_type')
+			]
+		);
+	
+		return $oSet->Fetch();
+	
+	}
+					]]></code>
+				</method>
+			</methods>
+			<presentation>
+				<details>
+					<items>
+						<item id="device1_id">
+							<rank>10</rank>
+						</item>
+						<item id="device1_port">
+							<rank>20</rank>
+						</item>
+						<item id="device2_id">
+							<rank>30</rank>
+						</item>
+						<item id="device2_port">
+							<rank>40</rank>
+						</item>
+						<item id="connection_type">
+							<rank>50</rank>
+						</item>
+						<item id="patch_label">
+							<rank>60</rank>
+						</item>
+						<item id="cable_type">
+							<rank>70</rank>
+						</item>
+						<item id="comment">
+							<rank>80</rank>
+						</item>
+					</items>
+				</details>
+				<search>
+					<items>
+						<item id="device1_id">
+							<rank>10</rank>
+						</item>
+						<item id="device1_port">
+							<rank>20</rank>
+						</item>
+						<item id="device2_id">
+							<rank>30</rank>
+						</item>
+						<item id="device2_port">
+							<rank>40</rank>
+						</item>
+						<item id="connection_type">
+							<rank>50</rank>
+						</item>
+						<item id="patch_label">
+							<rank>60</rank>
+						</item>
+						<item id="cable_type">
+							<rank>70</rank>
+						</item>
+					</items>
+				</search>
+				<list>
+					<items>
+						<item id="device1_id">
+							<rank>10</rank>
+						</item>
+						<item id="device1_port">
+							<rank>20</rank>
+						</item>
+						<item id="device2_id">
+							<rank>30</rank>
+						</item>
+						<item id="device2_port">
+							<rank>40</rank>
+						</item>
+						<item id="connection_type">
+							<rank>50</rank>
+						</item>
+						<item id="patch_label">
+							<rank>60</rank>
+						</item>
+						<item id="cable_type">
+							<rank>70</rank>
+						</item>
+						<item id="comment">
+							<rank>80</rank>
+						</item>
+					</items>
+				</list>
+			</presentation>
+		</class>
+		<class id="ConnectableCI"> 
+			<fields>
+				<field id="networkdevice_list" xsi:type="AttributeLinkedSetIndirect">
+					<linked_class _delta="redefine">lnkConnectableCIToConnectableCI</linked_class>
+					<ext_key_to_me _delta="redefine">device2_id</ext_key_to_me>
+					<ext_key_to_remote _delta="redefine">device1_id</ext_key_to_remote>
+				</field>
+			</fields>
+		</class>
+		<class id="NetworkDevice"> 
+			<fields>
+				<field id="connectablecis_list" xsi:type="AttributeLinkedSetIndirect">
+					<linked_class _delta="redefine">lnkConnectableCIToConnectableCI</linked_class> 
+					<ext_key_to_me _delta="redefine">device1_id</ext_key_to_me>
+					<ext_key_to_remote _delta="redefine">device2_id</ext_key_to_remote>
+				</field>
+			</fields>
+			<relations>
+				<relation id="impacts">
+					<neighbours>
+						<neighbour id="connectableci">
+							<query_down _delta="redefine"><![CDATA[SELECT ConnectableCI AS d JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device1_id = d.id WHERE l1.device2_id = :this->id AND l1.connection_type='downlink']]></query_down>
+							<query_up _delta="redefine"><![CDATA[SELECT ConnectableCI AS nw JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device2_id = nw.id WHERE l1.device1_id = :this->id AND l1.connection_type='downlink']]></query_up>
+						</neighbour>
+					</neighbours>
+				</relation>
+			</relations>
+		</class>
+	</classes>
+</itop_design>
+
+
