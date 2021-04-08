@@ -74,7 +74,7 @@
 				</field>
 				<field id="cable_type" xsi:type="AttributeEnum" _delta="define">
 					<sql>cable_type</sql>
-					<default_value/>
+					<default_value>rj45</default_value>
 					<is_null_allowed>true</is_null_allowed>
 					<values>
 						<value id="rj45">rj45</value>
@@ -89,28 +89,30 @@
 					<is_null_allowed>true</is_null_allowed>
 				</field>
 			</fields>
-			<methods>  
-				<method id="AddConnectedNetworkDevice">
+			<methods>
+				<method id="AddCounterPartLink">
 					<static>false</static>
 					<access>protected</access>
 					<type>Overload-cmdbAbstractObject</type>
-					<code><![CDATA[	
+					<code>
+						<![CDATA[	
 					
-	protected function AddConnectedNetworkDevice() {
+	protected function AddCounterPartLink() {
 		/* 
 			Explanation:
 			
 			ConnectableCI has a field 'networkdevice_list'. It's an indirect set, meaning multiple connections are possible. 
-			networkdevice_list (originally lnkConnectableCIToNetworkDevice) uses device1_id to refer to itself (NAS, Server, ...) and device2_id to point to what's remotely connected.
+			networkdevice_list (originally lnkConnectableCIToNetworkDevice) uses device1_id to refer to itself (NAS, Server, ...) 
+			and device2_id to point to what's remotely connected.
 			The logic below is easier if you think from the perspective of the original lnkConnectableCIToNetworkDevice class.
 			
 			Example 1: from the details view of a PC, a link with a network device is added.
-			- AddConnectedNetworkDevice() is triggered. Type of device1_id = pc; device2_id = NetworkDevice (switch).
+			- AddCounterPartLink() is triggered. Type of device1_id = pc; device2_id = NetworkDevice (switch).
 			- $oDevice is an object (pc).
 			- Only Network Device subclasses and IPPhone are supported. Otherwise no link is created.
 			  
 			Example 2: from the details view of a Network Device (or IP Phone = switch), a link with a network device is added.
-			- AddConnectedNetworkDevice() is triggered. Type of device1_id = NetworkDevice; device2_id = NetworkDevice (switch).
+			- AddCounterPartLink() is triggered. Type of device1_id = NetworkDevice; device2_id = NetworkDevice (switch).
 			- $oDevice is an object (NetworkDevice). It's of the right type (!= NAS, Server, ...).
 			- The counterpart is created.			
 			
@@ -125,7 +127,7 @@
 		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'));
 		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
 		
-			$oLnkCounterPart = $this->GetCounterPart();
+			$oLnkCounterPart = $this->GetCounterPart('create');
 			
 			if($oLnkCounterPart === null) {
 			
@@ -145,26 +147,27 @@
 		}
 	}]]></code>
 				</method>
-				<method id="UpdateConnectedNetworkDevice">
+				<method id="UpdateCounterPartLink">
 					<static>false</static>
 					<access>protected</access>
 					<type>Overload-cmdbAbstractObject</type>
-					<code><![CDATA[	
+					<code>
+						<![CDATA[	
 					
-	protected function UpdateConnectedNetworkDevice() {
+	protected function UpdateCounterPartLink() {
 					
 		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'));
 		
 		// IPPhone here is to support jb-ipdevices
 		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
 		
-			$oLnkCounterPart = $this->GetCounterPart();
+			$oLnkCounterPart = $this->GetCounterPart('update');
 			
 			// There should be one link - do it in a safe manner anyway
 			if($oLnkCounterPart !== null) {
 				$oLnkCounterPart->Set('connection_type', ($this->Get('connection_type') == 'uplink' ? 'downlink' : 'uplink'));
-				$oLnkCounterPart->Set('device2_port', $this->Get('device1_port'));
 				$oLnkCounterPart->Set('device1_port', $this->Get('device2_port'));
+				$oLnkCounterPart->Set('device2_port', $this->Get('device1_port'));
 				$oLnkCounterPart->Set('patch_label', $this->Get('patch_label'));
 				$oLnkCounterPart->Set('comment', $this->Get('comment'));
 				$oLnkCounterPart->Set('cable_type', $this->Get('cable_type'));
@@ -174,19 +177,20 @@
 		}
 	}]]></code>
 				</method>
-				<method id="DeleteConnectedNetworkDevice">
+				<method id="DeleteCounterPartLink">
 					<static>false</static>
 					<access>protected</access>
 					<type>Overload-cmdbAbstractObject</type>
-					<code><![CDATA[	
+					<code>
+						<![CDATA[	
 					
-	protected function DeleteConnectedNetworkDevice() {
+	protected function DeleteCounterPartLink() {
 					
 		// The device might be already deleted (reentrance in the current procedure when both device are NETWORK devices!)
 		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'), false);
 		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
 		
-			$oLnkCounterPart = $this->GetCounterPart();
+			$oLnkCounterPart = $this->GetCounterPart('delete');
 			
 			// There should be one link - do it in a safe manner anyway
 			if($oLnkCounterPart !== null) {
@@ -200,10 +204,11 @@
 					<static>false</static>
 					<access>protected</access>
 					<type>Overload-DBObject</type>
-					<code><![CDATA[	
+					<code>
+						<![CDATA[	
 				
 	protected function AfterInsert() {
-		$this->AddConnectedNetworkDevice();
+		$this->AddCounterPartLink();
 		parent::AfterInsert();
 		
 	}]]></code>
@@ -212,10 +217,11 @@
 					<static>false</static>
 					<access>protected</access>
 					<type>Overload-DBObject</type>
-					<code><![CDATA[	
+					<code>
+						<![CDATA[	
 					
 	protected function AfterUpdate() {
-		$this->UpdateConnectedNetworkDevice();
+		$this->UpdateCounterPartLink();
 		parent::AfterUpdate();
 	}]]></code>
 				</method>
@@ -223,39 +229,65 @@
 					<static>false</static>
 					<access>protected</access>
 					<type>Overload-DBObject</type>
-					<code><![CDATA[	
+					<code>
+						<![CDATA[	
 					
 	protected function AfterDelete() {
-		$this->DeleteConnectedNetworkDevice();
+		$this->DeleteCounterPartLink();
 		parent::AfterDelete();
 		
 	}]]></code>
 				</method>
-				<method id="DeleteConnectedNetworkDevice">
+				<method id="GetCounterPart">
 					<static>false</static>
 					<access>protected</access>
 					<type>Overload-cmdbAbstractObject</type>
-					<code><![CDATA[	
+					<arguments>
+						<argument id="1">
+							<type>string</type>
+							<mandatory>true</mandatory>
+						</argument>
+					</arguments>
+					<code>
+						<![CDATA[	
 					
-	protected function GetCounterPart() {
+	protected function GetCounterPart($sAction) {
 	
 		// Find the exact same link
 		$sOQL = "SELECT lnkConnectableCIToConnectableCI WHERE device1_id = :device1_id AND device2_id = :device2_id AND device1_port = :device1_port AND device2_port = :device2_port AND patch_label = :patch_label AND comment = :comment AND connection_type = :connection_type AND cable_type = :cable_type";
 		
-		// Switch device and port around (1 <=> 2); do same for uplink/downlink
+		// Switch device_id and device_port around (1 <=> 2); do same for uplink/downlink
 		
-		$oSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
-			[],
-			[
-				'device2_id' => $this->Get('device1_id'),
+		
+		// In case of updated ports:
+		if($sAction == 'update') {
+			$aQueryArgs = [
 				'device1_id' => $this->Get('device2_id'),
-				'device2_port' => $this->Get('device1_port'),
+				'device1_port' => $this->GetOriginal('device2_port'),
+				'device2_id' => $this->Get('device1_id'),
+				'device2_port' => $this->GetOriginal('device1_port'),
+				'connection_type' => ($this->GetOriginal('connection_type') == 'uplink' ? 'downlink' : 'uplink'),
+				'patch_label' => $this->GetOriginal('patch_label'),
+				'comment' => $this->GetOriginal('comment'),
+				'cable_type' => $this->GetOriginal('cable_type')
+			];
+		}
+		else {
+			$aQueryArgs = [
+				'device1_id' => $this->Get('device2_id'),
 				'device1_port' => $this->Get('device2_port'),
+				'device2_id' => $this->Get('device1_id'),
+				'device2_port' => $this->Get('device1_port'),
 				'connection_type' => ($this->Get('connection_type') == 'uplink' ? 'downlink' : 'uplink'),
 				'patch_label' => $this->Get('patch_label'),
 				'comment' => $this->Get('comment'),
 				'cable_type' => $this->Get('cable_type')
-			]
+			];
+		}
+		
+		$oSet = new DBObjectSet(DBObjectSearch::FromOQL($sOQL),
+			[],
+			$aQueryArgs
 		);
 	
 		return $oSet->Fetch();
@@ -348,7 +380,7 @@
 				</list>
 			</presentation>
 		</class>
-		<class id="ConnectableCI"> 
+		<class id="ConnectableCI">
 			<fields>
 				<field id="networkdevice_list" xsi:type="AttributeLinkedSetIndirect">
 					<linked_class _delta="redefine">lnkConnectableCIToConnectableCI</linked_class>
@@ -357,10 +389,10 @@
 				</field>
 			</fields>
 		</class>
-		<class id="NetworkDevice"> 
+		<class id="NetworkDevice">
 			<fields>
 				<field id="connectablecis_list" xsi:type="AttributeLinkedSetIndirect">
-					<linked_class _delta="redefine">lnkConnectableCIToConnectableCI</linked_class> 
+					<linked_class _delta="redefine">lnkConnectableCIToConnectableCI</linked_class>
 					<ext_key_to_me _delta="redefine">device1_id</ext_key_to_me>
 					<ext_key_to_remote _delta="redefine">device2_id</ext_key_to_remote>
 				</field>
@@ -369,8 +401,10 @@
 				<relation id="impacts">
 					<neighbours>
 						<neighbour id="connectableci">
-							<query_down _delta="redefine"><![CDATA[SELECT ConnectableCI AS d JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device1_id = d.id WHERE l1.device2_id = :this->id AND l1.connection_type='downlink']]></query_down>
-							<query_up _delta="redefine"><![CDATA[SELECT ConnectableCI AS nw JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device2_id = nw.id WHERE l1.device1_id = :this->id AND l1.connection_type='downlink']]></query_up>
+							<query_down _delta="redefine">
+								<![CDATA[SELECT ConnectableCI AS d JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device1_id = d.id WHERE l1.device2_id = :this->id AND l1.connection_type='downlink']]></query_down>
+							<query_up _delta="redefine">
+								<![CDATA[SELECT ConnectableCI AS nw JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device2_id = nw.id WHERE l1.device1_id = :this->id AND l1.connection_type='downlink']]></query_up>
 						</neighbour>
 					</neighbours>
 				</relation>
@@ -378,5 +412,3 @@
 		</class>
 	</classes>
 </itop_design>
-
-
