@@ -90,6 +90,25 @@
 				</field>
 			</fields>
 			<methods>
+				<method id="IsSupportedDevice">
+					<static>false</static>
+					<access>protected</access>
+					<type>Overload-cmdbAbstractObject</type>
+					<arguments/>
+					<code>
+						<![CDATA[	
+	
+	protected function IsSupportedDevice() {
+	
+		// The device might already be deleted (reentrance in the current procedure when both device are NETWORK devices!)
+		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'), false);
+		
+		// Only subclasses of a Network Device and of IP Phones are supported.
+		// IPPhone relies on jb-ipdevices, hence a string comparison.
+		return (is_object($oDevice) && ($oDevice instanceof NetworkDevice || get_class($oDevice) == 'IPPhone'));
+	
+	}]]></code>			
+				</method>
 				<method id="AddCounterPartLink">
 					<static>false</static>
 					<access>protected</access>
@@ -124,8 +143,7 @@
 			
 		*/
 	
-		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'));
-		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
+		if($this->IsSupportedDevice()) {
 		
 			$oLnkCounterPart = $this->GetCounterPart('create');
 			
@@ -155,11 +173,8 @@
 						<![CDATA[	
 					
 	protected function UpdateCounterPartLink() {
-					
-		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'));
 		
-		// IPPhone here is to support jb-ipdevices
-		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
+		if($this->IsSupportedDevice()) {
 		
 			$oLnkCounterPart = $this->GetCounterPart('update');
 			
@@ -185,10 +200,8 @@
 						<![CDATA[	
 					
 	protected function DeleteCounterPartLink() {
-					
-		// The device might be already deleted (reentrance in the current procedure when both device are NETWORK devices!)
-		$oDevice = MetaModel::GetObject('ConnectableCI', $this->Get('device1_id'), false);
-		if(is_object($oDevice) && in_array(get_class($oDevice), ['NetworkDevice', 'IPPhone'])) {
+		
+		if($this->IsSupportedDevice()) {
 		
 			$oLnkCounterPart = $this->GetCounterPart('delete');
 			
@@ -259,7 +272,7 @@
 		// Switch device_id and device_port around (1 <=> 2); do same for uplink/downlink
 		
 		
-		// In case of updated ports:
+		// In case of updated ports, retrieve original info (before edit):
 		if($sAction == 'update') {
 			$aQueryArgs = [
 				'device1_id' => $this->Get('device2_id'),
@@ -272,6 +285,7 @@
 				'cable_type' => $this->GetOriginal('cable_type')
 			];
 		}
+		// In case of deletion of original link, just find the counter part
 		else {
 			$aQueryArgs = [
 				'device1_id' => $this->Get('device2_id'),
