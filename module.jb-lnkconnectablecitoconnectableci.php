@@ -3,14 +3,14 @@
 /**
  * @copyright   Copyright (c) 2019-2021 Jeffrey Bostoen
  * @license     https://www.gnu.org/licenses/gpl-3.0.en.html
- * @version     2.6.210331
+ * @version     2.6.210802
  *
  * iTop module definition file
  */
  
 SetupWebPage::AddModule(
 	__FILE__, // Path to the current file, all other file names are relative to the directory containing this file
-	'jb-lnkconnectablecitoconnectableci/2.6.210331',
+	'jb-lnkconnectablecitoconnectableci/2.6.210802',
 	array(
 		// Identification
 		//
@@ -21,7 +21,6 @@ SetupWebPage::AddModule(
 		//
 		'dependencies' => array(
 			'itop-config-mgmt/2.6.0',
-			'itop-endusers-devices/2.6.0'
 		),
 		'mandatory' => false,
 		'visible' => true,

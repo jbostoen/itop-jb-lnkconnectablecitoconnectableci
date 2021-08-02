@@ -5,8 +5,8 @@
 	<author><![CDATA[Jeffrey Bostoen]]></author>
 	<label><![CDATA[Datamodel: Link Connectable CI / Connectable CI]]></label>
 	<description><![CDATA[Adds a class to link Connectable CIs to each other.]]></description>
-	<version>2.6.210331</version>
-	<release_date>2021-03-31</release_date>
+	<version>2.6.210802</version>
+	<release_date>2021-08-02</release_date>
 	<version_description><![CDATA[]]></version_description>
 	<itop_version_min>2.6.0</itop_version_min>
 	<status>stable</status>
