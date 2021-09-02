@@ -416,9 +416,13 @@
 					<neighbours>
 						<neighbour id="connectableci">
 							<query_down _delta="redefine">
-								<![CDATA[SELECT ConnectableCI AS d JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device1_id = d.id WHERE l1.device2_id = :this->id AND l1.connection_type='downlink']]></query_down>
+								<!-- Downstream = impacts. Get all CIs to which there is a downlink. -->
+								<![CDATA[SELECT ConnectableCI AS relatedCI JOIN lnkConnectableCIToConnectableCI AS link ON link.device2_id = relatedCI.id WHERE link.device1_id = :this->id AND link.connection_type = 'downlink']]>
+							</query_down>
 							<query_up _delta="redefine">
-								<![CDATA[SELECT ConnectableCI AS nw JOIN lnkConnectableCIToConnectableCI AS l1 ON l1.device2_id = nw.id WHERE l1.device1_id = :this->id AND l1.connection_type='downlink']]></query_up>
+								<!-- Upstream = depends on. Get all CIs to which there is an uplink. -->
+								<![CDATA[SELECT ConnectableCI AS relatedCI JOIN lnkConnectableCIToConnectableCI AS link ON link.device2_id = relatedCI.id WHERE link.device1_id = :this->id AND link.connection_type = 'uplink']]>
+							</query_up>
 						</neighbour>
 					</neighbours>
 				</relation>
